@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Check, X, Settings, Users, Swords, PieChart, Calculator, ChevronRight } from 'lucide-react';
+import { Plus, Check, X, Settings, Users, Swords, PieChart, Calculator, ChevronRight, TrendingUp, TrendingDown, Target, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { BOSSES, Difficulty } from '../data/bosses';
 
 type Character = {
@@ -28,7 +29,25 @@ const PRESETS = [
   { name: '이쌀돌이', bosses: { papulatus: 'CHAOS', suu: 'HARD', demian: 'HARD', slime: 'CHAOS', lucid: 'HARD', will: 'HARD', dusk: 'CHAOS', jinhilla: 'HARD', dunkel: 'HARD', seren: 'NORMAL', kalos: 'EASY', daejeokja: 'EASY' } as Record<string, Difficulty> },
   { name: '하세돌이', bosses: { papulatus: 'CHAOS', suu: 'HARD', demian: 'HARD', slime: 'CHAOS', lucid: 'HARD', will: 'HARD', dusk: 'CHAOS', jinhilla: 'HARD', dunkel: 'HARD', seren: 'HARD', kalos: 'EASY', daejeokja: 'EASY' } as Record<string, Difficulty> },
   { name: '익스우돌이', bosses: { suu: 'EXTREME', demian: 'HARD', slime: 'CHAOS', lucid: 'HARD', will: 'HARD', dusk: 'CHAOS', jinhilla: 'HARD', dunkel: 'HARD', seren: 'HARD', kalos: 'NORMAL', daejeokja: 'NORMAL', karing: 'EASY' } as Record<string, Difficulty> },
+  { name: '+검마', bosses: { blackmage: 'HARD' } as Record<string, Difficulty> },
 ];
+
+const CUBE_REWARDS: Record<string, Partial<Record<Difficulty, { bronze: number; silver: number; gold: number }>>> = {
+  papulatus: { CHAOS: { bronze: 1, silver: 0, gold: 0 } },
+  suu: { NORMAL: { bronze: 3, silver: 0, gold: 0 }, HARD: { bronze: 6, silver: 1, gold: 0 } },
+  demian: { NORMAL: { bronze: 3, silver: 0, gold: 0 }, HARD: { bronze: 6, silver: 1, gold: 0 } },
+  slime: { NORMAL: { bronze: 3, silver: 0, gold: 0 }, CHAOS: { bronze: 8, silver: 2, gold: 0 } },
+  lucid: { EASY: { bronze: 3, silver: 0, gold: 0 }, NORMAL: { bronze: 5, silver: 0, gold: 0 }, HARD: { bronze: 8, silver: 2, gold: 0 } },
+  will: { EASY: { bronze: 3, silver: 0, gold: 0 }, NORMAL: { bronze: 5, silver: 0, gold: 0 }, HARD: { bronze: 8, silver: 2, gold: 0 } },
+  dusk: { NORMAL: { bronze: 5, silver: 0, gold: 0 }, CHAOS: { bronze: 8, silver: 2, gold: 0 } },
+  jinhilla: { NORMAL: { bronze: 5, silver: 0, gold: 0 }, HARD: { bronze: 8, silver: 2, gold: 0 } },
+  dunkel: { NORMAL: { bronze: 5, silver: 0, gold: 0 }, HARD: { bronze: 8, silver: 2, gold: 0 } },
+  seren: { NORMAL: { bronze: 5, silver: 0, gold: 1 }, HARD: { bronze: 8, silver: 0, gold: 2 } },
+  kalos: { EASY: { bronze: 8, silver: 0, gold: 2 } },
+  daejeokja: { EASY: { bronze: 8, silver: 0, gold: 2 } },
+  karing: { EASY: { bronze: 8, silver: 0, gold: 2 } },
+  blackmage: { HARD: { bronze: 8, silver: 0, gold: 2 } },
+};
 
 const formatMeso = (amount: number) => {
   if (!amount) return '0';
@@ -127,11 +146,11 @@ export default function BossCalculator() {
     }));
   };
 
-  const applyPreset = (presetBosses: Record<string, Difficulty>) => {
+  const applyPreset = (presetBosses: Record<string, Difficulty>, isAdditive: boolean = false) => {
     if (!activeCharId) return;
     setCharacters(chars => chars.map(char => {
       if (char.id !== activeCharId) return char;
-      const newBosses: Record<string, { difficulty: Difficulty; partySize: number }> = {};
+      const newBosses: Record<string, { difficulty: Difficulty; partySize: number }> = isAdditive ? { ...char.bosses } : {};
       Object.entries(presetBosses).forEach(([bId, diff]) => {
         newBosses[bId] = { difficulty: diff, partySize: 1 };
       });
@@ -177,6 +196,37 @@ export default function BossCalculator() {
     return (weeklySum * 4) + monthlyBossSum;
   }, [characters]);
 
+  const totalCubes = useMemo(() => {
+    const checkedChars = characters.filter(c => c.isChecked);
+    let bronze = 0;
+    let silver = 0;
+    let gold = 0;
+
+    checkedChars.forEach(char => {
+      Object.entries(char.bosses).forEach(([bossId, data]: [string, any]) => {
+        const rewards = CUBE_REWARDS[bossId]?.[data.difficulty];
+        if (rewards) {
+          bronze += rewards.bronze;
+          silver += rewards.silver;
+          gold += rewards.gold;
+        }
+      });
+    });
+
+    return { bronze, silver, gold };
+  }, [characters]);
+
+  const getBossCountDisplay = (bosses: Record<string, any>) => {
+    const keys = Object.keys(bosses);
+    const hasBlackMage = keys.includes('blackmage');
+    const count = keys.length;
+    if (hasBlackMage) {
+      if (count === 1) return '+검마';
+      return `${count - 1}마리 +검마`;
+    }
+    return `${count}마리`;
+  };
+
   const handlePriceChange = (field: keyof typeof prices, value: string) => {
     const num = parseInt(value.replace(/[^0-9]/g, ''), 10);
     setPrices(prev => ({ ...prev, [field]: isNaN(num) ? 0 : num }));
@@ -208,103 +258,115 @@ export default function BossCalculator() {
   const activeCharacter = characters.find(c => c.id === activeCharId);
 
   return (
-    <div className="flex flex-col gap-6 font-sans animate-in fade-in duration-300 w-full mx-auto text-slate-800 dark:text-neutral-100 transition-colors">
+    <div className="flex flex-col gap-8 font-sans w-full mx-auto text-slate-800 dark:text-neutral-100 transition-colors pb-20">
       
-      {/* 시세 설정 (Compact Top Bar) */}
-      <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 p-4 rounded-2xl shadow-sm flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6 transition-colors">
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="bg-slate-100 dark:bg-neutral-800 p-2 rounded-lg">
-            <Settings size={18} className="text-slate-600 dark:text-neutral-400" />
+      {/* 시세 설정 (Premium Top Bar) */}
+      <div 
+        className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-slate-200 dark:border-neutral-800 p-6 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none flex flex-col lg:flex-row lg:items-center gap-6 transition-all"
+      >
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center shadow-inner">
+            <Settings size={22} className="text-indigo-600 dark:text-indigo-400" />
           </div>
-          <h3 className="font-bold text-slate-800 dark:text-neutral-100">시세 설정</h3>
-          <span className="text-slate-500 dark:text-neutral-500 text-xs ml-2 hidden sm:inline">1억 메소 당 가격</span>
+          <div>
+            <h3 className="font-black text-slate-900 dark:text-white tracking-tight">시세 설정</h3>
+            <p className="text-slate-500 dark:text-neutral-500 text-[11px] font-bold uppercase tracking-widest">1억당 가격</p>
+          </div>
         </div>
         
-        <div className="hidden lg:block w-px h-8 bg-slate-200 dark:bg-neutral-800"></div>
+        <div className="hidden lg:block w-px h-10 bg-slate-200 dark:bg-neutral-800"></div>
         
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
           {[
-            { id: 'mainMapo', label: '본섭 메포', color: 'text-indigo-600 dark:text-indigo-400' },
-            { id: 'mainEom', label: '본섭 엄', color: 'text-emerald-600 dark:text-emerald-400' },
-            { id: 'aetherMapo', label: '에헬 메포', color: 'text-indigo-600 dark:text-indigo-400' },
-            { id: 'aetherEom', label: '에헬 엄', color: 'text-emerald-600 dark:text-emerald-400' },
+            { id: 'mainMapo', label: '본섭 메포', color: 'indigo' },
+            { id: 'mainEom', label: '본섭 무통', color: 'emerald' },
+            { id: 'aetherMapo', label: '에헬 메포', color: 'indigo' },
+            { id: 'aetherEom', label: '에헬 무통', color: 'emerald' },
           ].map((item) => (
-            <div key={item.id} className="flex flex-col gap-1">
-              <label className={`text-[10px] font-bold uppercase tracking-wider ${item.color}`}>{item.label}</label>
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-lg px-3 py-1.5 focus-within:border-indigo-400 dark:focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-400 dark:focus-within:ring-indigo-500 transition-all">
+            <div key={item.id} className="group">
+              <label className={`text-[11px] font-black uppercase tracking-widest mb-1.5 block ${item.color === 'indigo' ? 'text-indigo-500' : 'text-emerald-500'}`}>
+                {item.label}
+              </label>
+              <div className="relative">
                 <input 
                   type="text" 
                   value={prices[item.id as keyof typeof prices] ? prices[item.id as keyof typeof prices].toLocaleString() : ''} 
                   onChange={e => handlePriceChange(item.id as keyof typeof prices, e.target.value)}
-                  className="w-full bg-transparent text-slate-900 dark:text-neutral-100 font-semibold text-sm focus:outline-none placeholder:text-slate-400 dark:placeholder:text-neutral-600"
+                  className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all dark:text-white"
                   placeholder="0"
                 />
-                <span className="text-slate-500 dark:text-neutral-500 text-xs font-medium">원</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-400 dark:text-neutral-600">KRW</span>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* 1. 캐릭터 관리 (Sidebar) */}
         <div className="lg:col-span-3 xl:col-span-2 flex flex-col gap-4">
-          <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-2xl p-4 flex flex-col h-[1400px] shadow-sm transition-colors">
-            <div className="flex items-center gap-2 mb-4">
-              <Users size={18} className="text-slate-600 dark:text-neutral-400" />
-              <h3 className="font-bold text-slate-800 dark:text-neutral-100">캐릭터 목록</h3>
-              <span className="bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 font-semibold text-xs px-2 py-0.5 rounded-full ml-auto">
+          <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-lg p-3 flex flex-col min-h-[800px] shadow-lg shadow-slate-200/30 dark:shadow-none transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-indigo-500" />
+                <h3 className="font-black text-slate-900 dark:text-white tracking-tight text-sm">캐릭터 목록</h3>
+              </div>
+              <span className="bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 font-black text-[10px] px-2 py-0.5 rounded uppercase tracking-wider">
                 {characters.length}
               </span>
             </div>
             
-            <form onSubmit={handleAddChar} className="flex flex-col gap-2 mb-4">
-              <div className="flex bg-slate-100 dark:bg-neutral-900 rounded-lg p-1 border border-slate-200 dark:border-neutral-800">
+            <form onSubmit={handleAddChar} className="space-y-2 mb-4">
+              <div className="flex bg-slate-100 dark:bg-neutral-950 rounded-lg p-0.5 border border-slate-200 dark:border-neutral-800">
                 <button
                   type="button"
                   onClick={() => setNewCharServer('MAIN')}
-                  className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-all ${newCharServer === 'MAIN' ? 'bg-white dark:bg-neutral-800 text-slate-800 dark:text-neutral-100 shadow-sm' : 'text-slate-500 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-neutral-300'}`}
+                  className={`flex-1 text-[10px] font-black py-1.5 rounded-lg transition-all uppercase tracking-widest ${newCharServer === 'MAIN' ? 'bg-white dark:bg-neutral-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-400 dark:text-neutral-600 hover:text-slate-600 dark:hover:text-neutral-400'}`}
                 >
                   본섭
                 </button>
                 <button
                   type="button"
                   onClick={() => setNewCharServer('AETHER')}
-                  className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-all ${newCharServer === 'AETHER' ? 'bg-white dark:bg-neutral-800 text-slate-800 dark:text-neutral-100 shadow-sm' : 'text-slate-500 dark:text-neutral-500 hover:text-slate-700 dark:hover:text-neutral-300'}`}
+                  className={`flex-1 text-[10px] font-black py-1.5 rounded-lg transition-all uppercase tracking-widest ${newCharServer === 'AETHER' ? 'bg-white dark:bg-neutral-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-400 dark:text-neutral-600 hover:text-slate-600 dark:hover:text-neutral-400'}`}
                 >
                   에헬
                 </button>
               </div>
-              <div className="flex gap-2">
+              <div className="relative group">
                 <input 
-                  className="flex-1 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-500 text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-500 transition-all" 
-                  placeholder="새 캐릭터 이름" 
+                  className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-lg pl-3 pr-10 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-700 transition-all" 
+                  placeholder="캐릭터 이름..." 
                   value={newCharName} 
                   onChange={e => setNewCharName(e.target.value)} 
                 />
-                <button type="submit" className="bg-slate-800 dark:bg-zinc-100 hover:bg-slate-900 dark:hover:bg-white text-white dark:text-neutral-900 p-2 rounded-lg transition-colors shadow-sm shrink-0">
-                  <Plus size={18} />
+                <button type="submit" className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 p-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md">
+                  <Plus size={14} />
                 </button>
               </div>
             </form>
 
-            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
               {characters.map(char => (
                 <div 
                   key={char.id} 
                   onClick={() => setActiveCharId(char.id)} 
-                  className={`p-3 rounded-xl cursor-pointer transition-all relative group flex items-center gap-3 border ${activeCharId === char.id ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50 shadow-sm' : 'bg-white dark:bg-neutral-900 border-transparent hover:bg-slate-50 dark:hover:bg-neutral-800/50 hover:border-slate-200 dark:hover:border-neutral-700'}`}
+                  className={`group p-2 rounded-lg cursor-pointer transition-all relative flex items-center gap-3 border-2 ${activeCharId === char.id ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-500 shadow-md shadow-indigo-500/10' : 'bg-white dark:bg-neutral-900 border-transparent hover:bg-slate-50 dark:hover:bg-neutral-800/50 hover:border-slate-100 dark:hover:border-neutral-800'}`}
                 >
-                  <div className={`w-1 h-8 rounded-full ${activeCharId === char.id ? 'bg-indigo-500' : 'bg-transparent'}`}></div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${char.serverType === 'MAIN' ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'}`}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <div className={`w-1 h-1 rounded-full ${char.serverType === 'MAIN' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
+                      <span className={`font-black text-xs truncate ${activeCharId === char.id ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-neutral-400'}`}>{char.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-neutral-600 uppercase tracking-tighter">
+                      <div className="flex items-center gap-1">
+                        <Target size={9} />
+                        {getBossCountDisplay(char.bosses)}
+                      </div>
+                      <div className="w-0.5 h-0.5 rounded-full bg-slate-300 dark:bg-neutral-700" />
+                      <span className={char.serverType === 'MAIN' ? 'text-indigo-500/80' : 'text-emerald-500/80'}>
                         {char.serverType === 'MAIN' ? '본섭' : '에헬'}
                       </span>
-                      <span className={`font-bold truncate ${activeCharId === char.id ? 'text-indigo-950 dark:text-indigo-100' : 'text-slate-700 dark:text-neutral-300'}`}>{char.name}</span>
-                    </div>
-                    <div className="text-xs mt-1 text-slate-500 dark:text-neutral-500 font-medium">
-                      보스 {Object.keys(char.bosses).length}마리
                     </div>
                   </div>
                   
@@ -314,16 +376,18 @@ export default function BossCalculator() {
                       setCharacters(chars => chars.filter(c => c.id !== char.id));
                       if (activeCharId === char.id) setActiveCharId(null);
                     }} 
-                    className="text-slate-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                    className="text-slate-300 dark:text-neutral-700 hover:text-rose-500 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-md"
                   >
-                    <X size={16} />
+                    <X size={12} />
                   </button>
                 </div>
               ))}
               {characters.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-neutral-500 text-sm gap-2">
-                  <Users size={24} className="opacity-50" />
-                  <span>캐릭터를 추가해주세요</span>
+                <div className="flex flex-col items-center justify-center h-full text-slate-300 dark:text-neutral-700 text-[11px] gap-3 py-10">
+                  <div className="w-12 h-12 bg-slate-50 dark:bg-neutral-950 rounded-lg flex items-center justify-center">
+                    <Users size={24} className="opacity-20" />
+                  </div>
+                  <span className="font-bold uppercase tracking-widest">캐릭터가 없습니다</span>
                 </div>
               )}
             </div>
@@ -331,38 +395,41 @@ export default function BossCalculator() {
         </div>
 
         {/* 2. 보스 선택 (Main Content) */}
-        <div className="lg:col-span-6 xl:col-span-7 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-2xl p-5 flex flex-col h-[1400px] shadow-sm transition-colors">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+        <div className="lg:col-span-6 xl:col-span-7 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-lg p-4 flex flex-col min-h-[800px] shadow-xl shadow-slate-200/50 dark:shadow-none transition-all">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
             <div className="flex items-center gap-3">
-              <div className="bg-rose-100 dark:bg-rose-900/30 p-2 rounded-lg shrink-0">
-                <Swords size={18} className="text-rose-600 dark:text-rose-400" />
+              <div className="w-10 h-10 bg-rose-100 dark:bg-rose-900/30 rounded-lg flex items-center justify-center shadow-inner">
+                <Swords size={20} className="text-rose-600 dark:text-rose-400" />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-bold text-slate-800 dark:text-neutral-100 whitespace-nowrap">
-                  보스 토벌
-                </h3>
-                {activeCharacter && (
-                  <>
-                    <ChevronRight size={14} className="text-slate-400 dark:text-neutral-500 shrink-0" />
-                    <span className="text-indigo-600 dark:text-indigo-400 font-bold truncate max-w-[150px] sm:max-w-[200px]">{activeCharacter.name}</span>
-                  </>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white tracking-tight text-lg">보스 선택</h3>
+                {activeCharacter ? (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{activeCharacter.name}</span>
+                    <div className="w-0.5 h-0.5 rounded-full bg-slate-300 dark:bg-neutral-700" />
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">{activeCharacter.serverType === 'MAIN' ? '본섭' : '에헬'}</span>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 dark:text-neutral-600 text-[10px] font-bold uppercase tracking-widest mt-0.5">캐릭터를 선택해주세요</p>
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 shrink-0">
+            
+            <div className="flex flex-wrap gap-1.5">
               <button 
                 onClick={() => applyPreset({})}
                 disabled={!activeCharId}
-                className="bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border border-red-200 dark:border-red-800/50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm mr-1"
+                className="bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-500 hover:text-white text-rose-600 dark:text-rose-400 text-[10px] font-black px-3 py-2 rounded-lg transition-all border border-rose-100 dark:border-rose-900/30 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-widest"
               >
                 초기화
               </button>
+              <div className="w-px h-6 bg-slate-200 dark:bg-neutral-800 mx-0.5 hidden sm:block" />
               {PRESETS.map(preset => (
                 <button 
                   key={preset.name}
-                  onClick={() => applyPreset(preset.bosses)}
+                  onClick={() => applyPreset(preset.bosses, preset.name.startsWith('+'))}
                   disabled={!activeCharId}
-                  className="bg-slate-50 dark:bg-neutral-900 hover:bg-slate-100 dark:hover:bg-neutral-800 text-slate-600 dark:text-neutral-300 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors border border-slate-200 dark:border-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  className="bg-slate-50 dark:bg-neutral-950 hover:bg-indigo-600 hover:text-white text-slate-600 dark:text-neutral-400 text-[10px] font-black px-3 py-2 rounded-lg transition-all border border-slate-200 dark:border-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-widest"
                 >
                   {preset.name}
                 </button>
@@ -371,16 +438,21 @@ export default function BossCalculator() {
           </div>
           
           {!activeCharId ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-neutral-500 text-sm gap-3 bg-slate-50/50 dark:bg-neutral-900/50 rounded-xl border border-dashed border-slate-200 dark:border-neutral-800">
-              <Swords size={32} className="opacity-30" />
-              <span>좌측에서 캐릭터를 선택해주세요</span>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-neutral-700 gap-6 bg-slate-50/50 dark:bg-neutral-950/50 rounded-xl border border-dashed border-slate-100 dark:border-neutral-900">
+              <div className="w-20 h-20 bg-white dark:bg-neutral-900 rounded-xl flex items-center justify-center shadow-xl">
+                <Target size={40} className="opacity-20" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="font-black uppercase tracking-[0.2em] text-sm">대기 중</p>
+                <p className="text-[11px] font-bold text-slate-400 dark:text-neutral-600 uppercase tracking-widest">캐릭터를 선택해주세요</p>
+              </div>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto pr-2 flex flex-col gap-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
-              <div className="grid grid-cols-[110px_1fr_70px_90px] gap-3 px-4 py-2 text-xs font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider border-b border-slate-200 dark:border-neutral-800/50 mb-2 sticky top-0 bg-white dark:bg-neutral-900 z-10">
+            <div className="flex-1 pr-2 space-y-1">
+              <div className="grid grid-cols-[140px_1fr_80px_100px] gap-4 px-4 py-2 text-[11px] font-black text-slate-400 dark:text-neutral-600 uppercase tracking-[0.15em] border-b border-slate-100 dark:border-neutral-800/50 mb-2 sticky top-0 bg-white dark:bg-neutral-900 z-10">
                 <div>보스</div>
                 <div>난이도</div>
-                <div className="text-center">파티원</div>
+                <div className="text-center">인원수</div>
                 <div className="text-right">수익</div>
               </div>
               {BOSSES.map(boss => {
@@ -390,10 +462,13 @@ export default function BossCalculator() {
                 const price = selectedDiff ? Math.floor((boss.difficulties.find(d => d.level === selectedDiff)?.price || 0) / partySize) : 0;
 
                 return (
-                  <div key={boss.id} className={`grid grid-cols-[110px_1fr_70px_90px] gap-3 items-center px-4 py-3 rounded-xl transition-colors border ${selectedDiff ? 'bg-slate-50 dark:bg-neutral-800/30 border-slate-200 dark:border-neutral-700/50 shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-50/50 dark:hover:bg-neutral-800/20'}`}>
-                    <div className="font-bold text-slate-800 dark:text-neutral-200 flex items-center gap-2 text-sm">
-                      <div 
-                        className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer shrink-0 transition-colors ${selectedDiff ? 'bg-indigo-600 dark:bg-zinc-100 border-indigo-600 dark:border-zinc-100 text-white dark:text-neutral-900 shadow-sm' : 'border-slate-300 dark:border-zinc-600 bg-white dark:bg-neutral-900 hover:border-indigo-400 dark:hover:border-zinc-400'}`} 
+                  <div 
+                    key={boss.id} 
+                    className={`grid grid-cols-[140px_1fr_80px_100px] gap-4 items-center px-4 py-2 rounded-xl transition-all border ${selectedDiff ? 'bg-slate-50/50 dark:bg-neutral-800/20 border-slate-100 dark:border-neutral-800/50 shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-50/30 dark:hover:bg-neutral-800/10'}`}
+                  >
+                    <div className="font-black text-slate-900 dark:text-white flex items-center gap-3 text-sm">
+                      <button 
+                        className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${selectedDiff ? 'bg-indigo-600 dark:bg-white border-indigo-600 dark:border-white text-white dark:text-neutral-900 shadow-lg shadow-indigo-500/20' : 'border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-indigo-400 dark:hover:border-neutral-600'}`} 
                         onClick={() => {
                           if (selectedDiff) {
                             handleToggleBoss(boss.id, selectedDiff);
@@ -402,35 +477,42 @@ export default function BossCalculator() {
                           }
                         }}
                       >
-                        {selectedDiff && <Check size={14} strokeWidth={3} />}
+                        {selectedDiff && <Check size={14} strokeWidth={4} />}
+                      </button>
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate leading-tight">{boss.name}</span>
+                        {boss.type === 'MONTHLY' && (
+                          <span className="text-[8px] text-amber-500 font-black uppercase tracking-widest mt-0.5">월간 보스</span>
+                        )}
                       </div>
-                      <span className="truncate flex-1">{boss.name}</span>
-                      {boss.type === 'MONTHLY' && (
-                        <span className="text-[8px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 px-1 py-0.5 rounded font-bold shrink-0">월간</span>
-                      )}
                     </div>
-                    <div className="flex flex-row gap-1.5 overflow-x-auto no-scrollbar">
+                    <div className="flex flex-row gap-2 overflow-x-auto no-scrollbar py-1">
                       {boss.difficulties.map(d => (
                         <button 
                           key={d.level} 
                           onClick={() => handleToggleBoss(boss.id, d.level)} 
-                          className={`text-[10px] font-bold px-2 py-1 rounded border transition-all shrink-0 ${selectedDiff === d.level ? diffColors[d.level] + ' shadow-sm' : 'border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-slate-500 dark:text-neutral-500 hover:border-slate-300 dark:hover:border-neutral-600 hover:text-slate-700 dark:hover:text-neutral-300'}`}
+                          className={`text-[10px] font-black px-3 py-1.5 rounded-xl border transition-all shrink-0 uppercase tracking-widest ${selectedDiff === d.level ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg' : 'border-slate-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-slate-400 dark:text-neutral-600 hover:border-slate-200 dark:hover:border-neutral-700'}`}
                         >
                           {diffShort[d.level]}
                         </button>
                       ))}
                     </div>
                     <div className="flex justify-center">
-                      <select 
-                        value={partySize} 
-                        onChange={(e) => handleChangePartySize(boss.id, Number(e.target.value))}
-                        disabled={!selectedDiff}
-                        className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-lg px-1 py-1.5 text-xs font-bold text-slate-700 dark:text-neutral-300 disabled:opacity-30 outline-none w-full focus:border-indigo-500 dark:focus:border-neutral-500 focus:ring-1 focus:ring-indigo-500 dark:focus:ring-neutral-500 transition-all cursor-pointer appearance-none text-center shadow-sm"
-                      >
-                        {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}인</option>)}
-                      </select>
+                      <div className="relative w-full group">
+                        <select 
+                          value={partySize} 
+                          onChange={(e) => handleChangePartySize(boss.id, Number(e.target.value))}
+                          disabled={!selectedDiff}
+                          className="w-full bg-white dark:bg-neutral-950 border border-slate-100 dark:border-neutral-800 rounded-xl px-2 py-2 text-[11px] font-black text-slate-700 dark:text-neutral-300 disabled:opacity-20 outline-none focus:border-indigo-500 dark:focus:border-neutral-600 transition-all cursor-pointer appearance-none text-center shadow-sm"
+                        >
+                          {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}인</option>)}
+                        </select>
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-300 dark:text-neutral-700 group-hover:text-indigo-500 transition-colors">
+                          <ChevronRight size={10} className="rotate-90" />
+                        </div>
+                      </div>
                     </div>
-                    <div className={`text-right text-sm font-bold truncate ${selectedDiff ? 'text-slate-800 dark:text-neutral-200' : 'text-slate-400 dark:text-neutral-500'}`}>
+                    <div className={`text-right text-xs font-black font-mono tracking-tighter ${selectedDiff ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-neutral-800'}`}>
                       {selectedDiff ? formatMeso(price) : '-'}
                     </div>
                   </div>
@@ -441,147 +523,112 @@ export default function BossCalculator() {
         </div>
 
         {/* 3. 정산 및 환산 (Right Column) */}
-        <div className="lg:col-span-3 xl:col-span-3 flex flex-col gap-6 h-[1400px]">
-          
+        <div className="lg:col-span-3 xl:col-span-3 flex flex-col gap-4 min-h-[800px]">
           {/* 총 수익 요약 */}
-          <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-2xl p-5 shadow-sm flex flex-col shrink-0 transition-colors">
-            <div className="text-slate-500 dark:text-neutral-400 text-xs font-bold uppercase tracking-wider mb-2">총 주간 메소 수익</div>
-            <div className="text-3xl font-black text-slate-900 dark:text-neutral-100 tracking-tight mb-4">{formatMeso(totalWeeklyProfit)}</div>
-
-            <div className="text-slate-500 dark:text-neutral-400 text-xs font-bold uppercase tracking-wider mb-2 border-t border-slate-100 dark:border-neutral-800 pt-4">총 월간 메소 수익 (4주)</div>
-            <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tracking-tight mb-4">{formatMeso(totalMonthlyProfit)}</div>
+          <div className="bg-slate-900 dark:bg-neutral-900 rounded-lg p-4 shadow-xl shadow-indigo-500/20 flex flex-col shrink-0 text-white relative overflow-hidden border border-white/5">
+            <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 w-24 h-24 bg-indigo-500/20 blur-[30px] rounded-full" />
             
-            <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-slate-200 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700">
-              {characters.map(char => (
-                <div key={char.id} className={`flex items-center justify-between text-sm ${char.isChecked ? 'opacity-100' : 'opacity-40'}`}>
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <div 
-                      className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center cursor-pointer shrink-0 transition-colors ${char.isChecked ? 'bg-slate-800 dark:bg-zinc-500 border-slate-800 dark:border-zinc-500' : 'border-slate-300 dark:border-neutral-700'}`} 
-                      onClick={() => {
-                        setCharacters(chars => chars.map(c => c.id === char.id ? { ...c, isChecked: !c.isChecked } : c));
-                      }}
-                    >
-                      {char.isChecked && <Check size={10} className="text-white dark:text-neutral-900" strokeWidth={3} />}
-                    </div>
-                    <span className="truncate font-medium text-slate-700 dark:text-neutral-300">{char.name}</span>
-                  </div>
-                  <span className="font-bold text-slate-600 dark:text-neutral-400 shrink-0">{formatMeso(getCharWeeklyProfit(char))}</span>
+            <div className="relative z-10">
+              <div className="text-indigo-300/60 text-[10px] font-black uppercase tracking-[0.2em] mb-2">주간 총 수익</div>
+              <div className="text-2xl font-black tracking-tighter mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-indigo-200">
+                {formatMeso(totalWeeklyProfit)} 메소
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-indigo-300/40 border-b border-white/5 pb-1.5">
+                  <span>월간 예상 수익</span>
+                  <span className="text-indigo-400">4주 기준</span>
                 </div>
-              ))}
+                <div className="text-lg font-black text-white tracking-tight">
+                  {formatMeso(totalMonthlyProfit)} 메소
+                </div>
+              </div>
+              
+              <div className="space-y-1.5 max-h-[150px] overflow-y-auto pr-1.5 custom-scrollbar-light">
+                {characters.map(char => (
+                  <div key={char.id} className={`flex items-center justify-between group ${char.isChecked ? 'opacity-100' : 'opacity-30'}`}>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <button 
+                        className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${char.isChecked ? 'bg-indigo-500 border-indigo-500' : 'border-white/20'}`} 
+                        onClick={() => {
+                          setCharacters(chars => chars.map(c => c.id === char.id ? { ...c, isChecked: !c.isChecked } : c));
+                        }}
+                      >
+                        {char.isChecked && <Check size={8} className="text-white" strokeWidth={4} />}
+                      </button>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate text-[11px] font-bold text-indigo-100/80">{char.name}</span>
+                        <span className={`text-[8px] font-black px-1 rounded-[2px] ${char.serverType === 'MAIN' ? 'bg-indigo-500/30 text-indigo-200' : 'bg-emerald-500/30 text-emerald-200'}`}>
+                          {char.serverType === 'MAIN' ? '본섭' : '에헬'}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="font-black text-[11px] text-white/90 font-mono tracking-tighter">{formatMeso(getCharWeeklyProfit(char))} 메소</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* 환산 결과 */}
-          <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-2xl p-5 shadow-sm flex-1 flex flex-col transition-colors min-h-0">
-            <div className="flex items-center gap-2 mb-4 shrink-0">
-              <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
-                <Calculator size={18} className="text-emerald-600 dark:text-emerald-400" />
+          <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-lg p-4 shadow-lg shadow-slate-200/50 dark:shadow-none flex flex-col transition-all shrink-0">
+            <div className="flex items-center gap-2.5 mb-6 shrink-0">
+              <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center shadow-inner">
+                <Calculator size={16} className="text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h3 className="font-bold text-slate-800 dark:text-neutral-100">환산 결과</h3>
+              <h3 className="font-black text-slate-900 dark:text-white tracking-tight text-base">환산 메포 계산기</h3>
             </div>
 
-            <div className="flex flex-col gap-4 flex-1 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-200 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+            <div className="flex flex-col gap-6">
               {/* 주간 환산 */}
               <div className="space-y-3">
-                <h4 className="text-sm font-bold text-slate-700 dark:text-neutral-300 border-b border-slate-200 dark:border-neutral-800 pb-2">주간 환산</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {/* 본섭 주간 */}
-                  <div className="bg-indigo-50/50 dark:bg-neutral-900/50 border border-indigo-100 dark:border-neutral-800/80 rounded-xl p-3">
-                    <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> 본섭
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">메포</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{mainWeeklyMapo.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">엄</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{mainWeeklyEom.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                  {/* 에헬 주간 */}
-                  <div className="bg-emerald-50/50 dark:bg-neutral-900/50 border border-emerald-100 dark:border-neutral-800/80 rounded-xl p-3">
-                    <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 에헬
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">메포</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{aetherWeeklyMapo.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">엄</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{aetherWeeklyEom.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[12px] font-black text-slate-400 dark:text-neutral-600 uppercase tracking-[0.2em]">주간 정산</h4>
+                  <div className="h-px flex-1 bg-slate-100 dark:bg-neutral-800 mx-3" />
                 </div>
-                {/* 주간 총합 */}
-                <div className="bg-slate-100 dark:bg-neutral-800/50 border border-slate-200 dark:border-neutral-700 rounded-xl p-3 flex justify-between items-center">
-                  <div className="text-[11px] font-bold text-slate-700 dark:text-neutral-300 uppercase tracking-wider">주간 총합</div>
-                  <div className="flex gap-4">
-                    <div className="flex items-end gap-1.5">
-                      <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold mb-0.5">메포</span>
-                      <span className="text-sm font-black text-slate-800 dark:text-neutral-100">{totalWeeklyMapo.toLocaleString()}</span>
+                
+                <div className="grid grid-cols-1 gap-2">
+                  <ConversionRow label="본섭" mapo={mainWeeklyMapo} eom={mainWeeklyEom} color="indigo" />
+                  <ConversionRow label="에헬" mapo={aetherWeeklyMapo} eom={aetherWeeklyEom} color="emerald" />
+                </div>
+                
+                <div className="bg-slate-900 dark:bg-neutral-800 p-3 rounded-lg flex justify-between items-center shadow-md shadow-slate-900/20 border border-white/5">
+                  <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">주간 합계</div>
+                  <div className="flex gap-3">
+                    <div className="text-right">
+                      <div className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">메포</div>
+                      <div className="text-[13px] font-black text-white font-mono">{totalWeeklyMapo.toLocaleString()} 메포</div>
                     </div>
-                    <div className="flex items-end gap-1.5">
-                      <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold mb-0.5">엄</span>
-                      <span className="text-sm font-black text-slate-800 dark:text-neutral-100">{totalWeeklyEom.toLocaleString()}</span>
+                    <div className="text-right">
+                      <div className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">무통</div>
+                      <div className="text-[13px] font-black text-white font-mono">{totalWeeklyEom.toLocaleString()} 원</div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 월간 환산 */}
-              <div className="space-y-3 mt-2">
-                <h4 className="text-sm font-bold text-slate-700 dark:text-neutral-300 border-b border-slate-200 dark:border-neutral-800 pb-2">월간 환산 (4주)</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {/* 본섭 월간 */}
-                  <div className="bg-indigo-50/50 dark:bg-neutral-900/50 border border-indigo-100 dark:border-neutral-800/80 rounded-xl p-3">
-                    <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> 본섭
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">메포</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{mainMonthlyMapo.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">엄</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{mainMonthlyEom.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                  {/* 에헬 월간 */}
-                  <div className="bg-emerald-50/50 dark:bg-neutral-900/50 border border-emerald-100 dark:border-neutral-800/80 rounded-xl p-3">
-                    <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 에헬
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">메포</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{aetherMonthlyMapo.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold">엄</span>
-                        <span className="text-sm font-black text-slate-800 dark:text-neutral-200">{aetherMonthlyEom.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[12px] font-black text-slate-400 dark:text-neutral-600 uppercase tracking-[0.2em]">월간 정산</h4>
+                  <div className="h-px flex-1 bg-slate-100 dark:border-neutral-800 mx-3" />
                 </div>
-                {/* 월간 총합 */}
-                <div className="bg-slate-100 dark:bg-neutral-800/50 border border-slate-200 dark:border-neutral-700 rounded-xl p-3 flex justify-between items-center">
-                  <div className="text-[11px] font-bold text-slate-700 dark:text-neutral-300 uppercase tracking-wider">월간 총합</div>
-                  <div className="flex gap-4">
-                    <div className="flex items-end gap-1.5">
-                      <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold mb-0.5">메포</span>
-                      <span className="text-sm font-black text-slate-800 dark:text-neutral-100">{totalMonthlyMapo.toLocaleString()}</span>
+                
+                <div className="grid grid-cols-1 gap-2">
+                  <ConversionRow label="본섭" mapo={mainMonthlyMapo} eom={mainMonthlyEom} color="indigo" />
+                  <ConversionRow label="에헬" mapo={aetherMonthlyMapo} eom={aetherMonthlyEom} color="emerald" />
+                </div>
+
+                <div className="bg-indigo-600 dark:bg-indigo-500 p-3 rounded-lg flex justify-between items-center shadow-md shadow-indigo-500/20 border border-white/5">
+                  <div className="text-[10px] font-black text-white uppercase tracking-widest">월간 합계</div>
+                  <div className="flex gap-3">
+                    <div className="text-right">
+                      <div className="text-[9px] font-black text-indigo-200 uppercase tracking-tighter">메포</div>
+                      <div className="text-[13px] font-black text-white font-mono">{totalMonthlyMapo.toLocaleString()} 메포</div>
                     </div>
-                    <div className="flex items-end gap-1.5">
-                      <span className="text-slate-500 dark:text-neutral-500 text-[10px] font-bold mb-0.5">엄</span>
-                      <span className="text-sm font-black text-slate-800 dark:text-neutral-100">{totalMonthlyEom.toLocaleString()}</span>
+                    <div className="text-right">
+                      <div className="text-[9px] font-black text-indigo-200 uppercase tracking-tighter">무통</div>
+                      <div className="text-[13px] font-black text-white font-mono">{totalMonthlyEom.toLocaleString()} 원</div>
                     </div>
                   </div>
                 </div>
@@ -589,8 +636,57 @@ export default function BossCalculator() {
             </div>
           </div>
 
+          {/* 메멘토 큐브 획득 갯수 */}
+          <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-lg p-4 shadow-lg shadow-slate-200/50 dark:shadow-none flex-1 flex flex-col transition-all">
+            <div className="flex items-center gap-2.5 mb-6 shrink-0">
+              <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center shadow-inner">
+                <Zap size={16} className="text-amber-600 dark:text-amber-400" />
+              </div>
+              <h3 className="font-black text-slate-900 dark:text-white tracking-tight text-base">큐브 전체 갯수</h3>
+            </div>
+            <div className="space-y-1.5 overflow-y-auto pr-1 custom-scrollbar">
+              <CubeItem icon="🥉" label="메멘토 브론즈" count={totalCubes.bronze} />
+              <CubeItem icon="🥈" label="메멘토 실버" count={totalCubes.silver} />
+              <CubeItem icon="🥇" label="메멘토 골드" count={totalCubes.gold} />
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ConversionRow({ label, mapo, eom, color }: { label: string, mapo: number, eom: number, color: 'indigo' | 'emerald' }) {
+  return (
+    <div className={`p-3 rounded-xl border transition-all ${color === 'indigo' ? 'bg-indigo-50/30 dark:bg-indigo-900/10 border-indigo-50 dark:border-indigo-900/20' : 'bg-emerald-50/30 dark:bg-emerald-900/10 border-emerald-50 dark:border-emerald-900/20'}`}>
+      <div className="text-[12px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+        <div className={`w-1.5 h-1.5 rounded-full ${color === 'indigo' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
+        {label}
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="text-[10px] font-black text-slate-400 dark:text-neutral-600 uppercase tracking-tighter mb-0.5">메포</div>
+          <div className="text-base font-black text-slate-900 dark:text-white font-mono tracking-tighter">{mapo.toLocaleString()} 메포</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] font-black text-slate-400 dark:text-neutral-600 uppercase tracking-tighter mb-0.5">무통</div>
+          <div className="text-base font-black text-slate-900 dark:text-white font-mono tracking-tighter">{eom.toLocaleString()} 원</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CubeItem({ icon, label, count }: { icon: string, label: string, count: number }) {
+  return (
+    <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-neutral-950 rounded-xl border border-slate-100 dark:border-neutral-800 group hover:border-indigo-200 dark:hover:border-indigo-900 transition-all">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 bg-white dark:bg-neutral-900 rounded-lg flex items-center justify-center text-sm shadow-sm group-hover:scale-110 transition-transform">
+          {icon}
+        </div>
+        <span className="text-[13px] font-bold text-slate-600 dark:text-neutral-400 uppercase tracking-tight">{label}</span>
+      </div>
+      <span className="text-sm font-black text-slate-900 dark:text-white font-mono">{count} 개</span>
     </div>
   );
 }

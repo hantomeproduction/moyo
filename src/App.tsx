@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Tv, Calculator, CheckCircle2, Circle, RefreshCw, X, Moon, Sun, Maximize, Minimize, Utensils } from 'lucide-react';
+import { Tv, Calculator, CheckCircle2, Circle, RefreshCw, X, Moon, Sun, Maximize, Minimize, Utensils, Swords } from 'lucide-react';
 import YouTube from 'react-youtube';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import BossCalculator from './components/BossCalculator';
 import FoodRecommendation from './components/FoodRecommendation';
+import CraftingCalculator from './components/CraftingCalculator';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCR4rKTS_FEkLLhUuBlgbNgHbo-c_mp2Mw",
@@ -21,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'youtube' | 'calc' | 'food'>('youtube');
+  const [activeTab, setActiveTab] = useState<'youtube' | 'calc' | 'food' | 'craft'>('youtube');
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') === 'dark';
@@ -173,26 +174,41 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-neutral-900 text-gray-800 dark:text-neutral-100 p-4 sm:p-8 font-sans transition-colors duration-300">
-      <div className="w-full mx-auto">
+    <div className="min-h-screen bg-slate-50 dark:bg-neutral-950 text-slate-900 dark:text-neutral-100 font-sans transition-colors duration-500 selection:bg-indigo-100 dark:selection:bg-indigo-900/50">
+      {/* Background Decorative Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/5 dark:bg-indigo-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[20%] -right-[5%] w-[30%] h-[30%] bg-emerald-500/5 dark:bg-emerald-500/10 blur-[100px] rounded-full" />
+      </div>
+
+      <div className="relative max-w-full mx-auto px-4 sm:px-6 lg:px-12 py-8 sm:py-12">
         {/* Header */}
-        <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            {/* Logo Container */}
-            <div className="w-16 h-16 bg-white dark:bg-neutral-800 rounded-2xl shadow-sm flex items-center justify-center overflow-hidden border border-gray-200 dark:border-neutral-700 shrink-0 transition-colors">
-              <img 
-                src="/logo.png" 
-                alt="Guild Logo" 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
+        <header className="flex flex-col sm:flex-row items-center justify-between mb-12 gap-6">
+          <div className="flex items-center gap-5">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-xl blur opacity-5 group-hover:opacity-10 transition duration-1000 group-hover:duration-200" />
+              <div className="relative w-14 h-14 bg-white dark:bg-neutral-900 rounded-xl shadow-xl flex items-center justify-center overflow-hidden border border-white/50 dark:border-neutral-800 shrink-0 transition-transform duration-500 group-hover:scale-105">
+                <img 
+                  src="/logo.png" 
+                  alt="Guild Logo" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white font-title tracking-tight">모요 길드 라운지</h1>
+            <div className="flex flex-col">
+              <h1 className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white">
+                모요 <span className="text-indigo-600 dark:text-indigo-400">길드 라운지</span>
+              </h1>
+              <p className="text-[11px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-[0.2em]">
+                Moyo Guild Community Hub
+              </p>
+            </div>
           </div>
           
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className="p-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl shadow-sm text-slate-600 dark:text-neutral-400 hover:bg-slate-50 dark:hover:bg-neutral-700 transition-all"
+            className="p-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border border-slate-200 dark:border-neutral-800 rounded-xl shadow-lg text-slate-600 dark:text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all duration-300"
             aria-label="Toggle Dark Mode"
           >
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
@@ -200,202 +216,224 @@ export default function App() {
         </header>
 
         {/* Navigation */}
-        <nav className="flex flex-wrap gap-3 mb-8">
-          <button
-            onClick={() => setActiveTab('youtube')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-base transition-all ${
-              activeTab === 'youtube'
-                ? 'bg-indigo-600 text-white shadow-md scale-105'
-                : 'bg-slate-200 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:bg-slate-300 dark:hover:bg-neutral-700'
-            }`}
-          >
-            <Tv size={20} />
-            1. 유튜브 같이 보기
-          </button>
-          <button
-            onClick={() => setActiveTab('calc')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-base transition-all ${
-              activeTab === 'calc'
-                ? 'bg-indigo-600 text-white shadow-md scale-105'
-                : 'bg-slate-200 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:bg-slate-300 dark:hover:bg-neutral-700'
-            }`}
-          >
-            <Calculator size={20} />
-            2. 결정 수익 계산기
-          </button>
-          <button
-            onClick={() => setActiveTab('food')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-base transition-all ${
-              activeTab === 'food'
-                ? 'bg-indigo-600 text-white shadow-md scale-105'
-                : 'bg-slate-200 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:bg-slate-300 dark:hover:bg-neutral-700'
-            }`}
-          >
-            <Utensils size={20} />
-            3. 음식 메뉴 추천
-          </button>
+        <nav className="flex flex-wrap gap-1 mb-4 p-1 bg-slate-200/50 dark:bg-neutral-900/50 backdrop-blur-sm rounded-lg border border-white/20 dark:border-neutral-800/50">
+          {[
+            { id: 'youtube', icon: Tv, label: '시청각실', color: 'indigo' },
+            { id: 'calc', icon: Calculator, label: '결정 수익', color: 'amber' },
+            { id: 'food', icon: Utensils, label: '메뉴 추천', color: 'rose' },
+            { id: 'craft', icon: Swords, label: '제작 수익', color: 'emerald' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`relative flex items-center gap-2 px-4 py-2 rounded-md font-bold text-xs transition-all duration-300 flex-1 sm:flex-none justify-center ${
+                activeTab === tab.id
+                  ? 'text-white'
+                  : 'text-slate-600 dark:text-neutral-400 hover:bg-white/50 dark:hover:bg-neutral-800/50'
+              }`}
+            >
+              {activeTab === tab.id && (
+                <div
+                  className="absolute inset-0 bg-indigo-600 dark:bg-indigo-500 rounded-md shadow-md shadow-indigo-500/20"
+                />
+              )}
+              <tab.icon size={16} className="relative z-10" />
+              <span className="relative z-10 whitespace-nowrap">{tab.label}</span>
+            </button>
+          ))}
         </nav>
 
         {/* Content */}
-        <main className="bg-white dark:bg-neutral-800 p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-neutral-700 min-h-[500px] transition-colors">
+        <main 
+          className="glass-card p-2 sm:p-3 rounded-lg min-h-[600px] transition-all duration-500"
+        >
           {activeTab === 'youtube' && (
-            <div className="animate-in fade-in duration-300">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-2 dark:text-white">
+            <div className="space-y-8">
+              <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full text-xs font-bold tracking-wider uppercase">
+                    실시간 동기화
+                  </div>
+                  <h2 className="text-3xl font-extrabold dark:text-white tracking-tight">
                     📺 모요 시청각실
                   </h2>
-                  <p className="text-slate-500 dark:text-neutral-400 text-sm">
-                    * 링크를 입력하면 모든 길드원의 화면이 해당 영상으로 바뀝니다.
+                  <p className="text-slate-500 dark:text-neutral-400 text-sm leading-relaxed max-w-xl">
+                    길드원들과 실시간으로 영상을 공유하세요. 링크를 입력하면 모든 접속자의 화면이 동기화됩니다.
                   </p>
                 </div>
                 
-                <div className="flex flex-col items-end shrink-0">
-                  <button
+                <div className="flex flex-col items-end gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleSync}
                     disabled={isSyncing}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                    className="flex items-center gap-2.5 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-xl shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed group"
                   >
-                    <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} />
+                    <RefreshCw size={20} className={isSyncing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"} />
                     {isSyncing ? '동기화 중...' : '다함께 동기화'}
-                  </button>
+                  </motion.button>
                   {lastSyncTime && (
-                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-2 flex items-center gap-1">
-                      <CheckCircle2 size={12} />
-                      마지막 동기화: {lastSyncTime}
-                    </span>
+                    <motion.span 
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full"
+                    >
+                      <CheckCircle2 size={14} />
+                      최종 동기화: {lastSyncTime}
+                    </motion.span>
                   )}
                 </div>
               </div>
 
               {/* 영상 변경 입력창 */}
-              <div className="mb-6 flex flex-col sm:flex-row gap-2 w-full mx-auto">
-                <input 
-                  type="text" 
-                  value={inputUrl}
-                  onChange={(e) => setInputUrl(e.target.value)}
-                  placeholder="유튜브 링크를 붙여넣으세요 (예: https://youtu.be/...)"
-                  className="flex-1 px-4 py-3 bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500 dark:text-white transition-all"
-                />
+              <div className="flex flex-col sm:flex-row gap-3 p-1.5 bg-slate-100 dark:bg-neutral-900/50 rounded-xl border border-slate-200 dark:border-neutral-800">
+                <div className="relative flex-1 group">
+                  <input 
+                    type="text" 
+                    value={inputUrl}
+                    onChange={(e) => setInputUrl(e.target.value)}
+                    placeholder="유튜브 링크를 붙여넣으세요..."
+                    className="w-full px-5 py-2.5 bg-transparent text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 dark:placeholder:text-neutral-600 font-medium text-sm"
+                  />
+                  <div className="absolute bottom-0 left-5 right-5 h-0.5 bg-indigo-500 scale-x-0 group-focus-within:scale-x-100 transition-transform duration-500" />
+                </div>
                 <div className="flex gap-2">
-                  <button 
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleVideoChange}
-                    className="flex-1 sm:flex-none px-6 py-3 bg-slate-800 dark:bg-neutral-100 text-white dark:text-neutral-900 font-bold rounded-xl hover:bg-slate-700 dark:hover:bg-white transition-all whitespace-nowrap shadow-sm active:scale-95"
+                    className="flex-1 sm:flex-none px-6 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl hover:shadow-lg transition-all whitespace-nowrap text-sm"
                   >
                     영상 변경
-                  </button>
-                  <button 
+                  </motion.button>
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setIsFitToScreen(true)}
-                    className="flex-1 sm:flex-none px-4 py-3 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 font-bold rounded-xl hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all whitespace-nowrap shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                    className="flex-1 sm:flex-none px-4 py-2.5 bg-white dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 font-bold rounded-xl border border-slate-200 dark:border-neutral-700 hover:bg-slate-50 dark:hover:bg-neutral-700 transition-all flex items-center justify-center gap-2 shadow-sm text-sm"
                   >
                     <Maximize size={18} />
-                    <span className="hidden sm:inline">화면에 맞추기</span>
-                  </button>
+                    <span className="hidden sm:inline">전체화면</span>
+                  </motion.button>
                 </div>
               </div>
 
+              {/* Video Placeholder or Info */}
+              {activeTab === 'youtube' && !isFitToScreen && (
+                <div className="relative aspect-video w-full rounded-xl overflow-hidden shadow-2xl bg-black group ring-8 ring-slate-100 dark:ring-neutral-900/50">
+                  <YouTube
+                    videoId={currentVideoId}
+                    ref={playerRef}
+                    opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0, rel: 0, modestbranding: 1 } }}
+                    onPlay={onPlay}
+                    onPause={onPause}
+                    onEnd={() => { isPlayingRef.current = false; updateServerState(false); }}
+                    onStateChange={(e) => {
+                      isPlayingRef.current = (e.data === 1 || e.data === 3);
+                    }}
+                    className="absolute inset-0 w-full h-full"
+                    iframeClassName="w-full h-full"
+                  />
+                  {isSyncing && (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-10 pointer-events-none">
+                      <div className="flex flex-col items-center gap-4">
+                        <RefreshCw size={48} className="text-indigo-400 animate-spin" />
+                        <span className="text-white font-bold tracking-widest uppercase text-sm">콘텐츠 동기화 중...</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {activeTab === 'calc' && (
-            <BossCalculator />
-          )}
+          {activeTab === 'calc' && <BossCalculator />}
+          {activeTab === 'food' && <FoodRecommendation />}
+          {activeTab === 'craft' && <CraftingCalculator />}
+        </main>
 
-          {activeTab === 'food' && (
-            <FoodRecommendation />
-          )}
-
-          {/* YouTube Player - Always Rendered for PIP */}
-          <AnimatePresence>
-            {(activeTab === 'youtube' || (!isPipClosed && currentVideoId)) && (
-              <motion.div 
-                layout
-                initial={activeTab !== 'youtube' ? { opacity: 0, x: 100 } : false}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 200, transition: { duration: 0.2 } }}
-                drag={activeTab !== 'youtube' ? "x" : false}
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.2}
-                onDragEnd={(e, info) => {
-                  if (activeTab !== 'youtube' && info.offset.x > 100) {
-                    setIsPipClosed(true);
-                  }
-                }}
-                whileHover={activeTab !== 'youtube' ? { scale: 1.05 } : {}}
-                className={
-                  activeTab === 'youtube'
-                    ? isFitToScreen
-                      ? "fixed inset-0 z-[100] bg-neutral-950 flex flex-col"
-                      : "aspect-video w-full mx-auto rounded-xl overflow-hidden shadow-lg bg-black relative group mt-2"
-                    : "fixed bottom-6 right-6 w-72 sm:w-96 aspect-video rounded-xl overflow-hidden shadow-2xl bg-black z-50 border-4 border-slate-800 cursor-grab active:cursor-grabbing group"
-                }
+        {/* Picture-in-Picture Mode */}
+        <AnimatePresence>
+          {activeTab !== 'youtube' && !isPipClosed && currentVideoId && (
+            <motion.div 
+              layout
+              initial={{ opacity: 0, scale: 0.8, y: 50 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 50 }}
+              drag
+              dragConstraints={{ left: -500, right: 500, top: -500, bottom: 500 }}
+              className="fixed bottom-8 right-8 w-80 sm:w-[400px] aspect-video rounded-xl overflow-hidden shadow-2xl bg-black z-50 border-4 border-white dark:border-neutral-800 cursor-grab active:cursor-grabbing group ring-1 ring-black/5"
+            >
+              <YouTube
+                videoId={currentVideoId}
+                ref={playerRef}
+                opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0, controls: 0, disablekb: 1 } }}
+                onPlay={onPlay}
+                onPause={onPause}
+                className="absolute inset-0 w-full h-full"
+              />
+              
+              <div 
+                className="absolute inset-0 z-20 bg-black/0 hover:bg-black/40 transition-all flex items-center justify-center group"
+                onClick={() => setActiveTab('youtube')}
               >
-                {/* 화면 꽉차게 보기 닫기 버튼 (상단 바) */}
-                {activeTab === 'youtube' && isFitToScreen && (
-                  <div className="h-10 bg-neutral-900 border-b border-neutral-800 flex items-center justify-end px-4 shrink-0 z-[110]">
-                    <button
-                      onClick={() => setIsFitToScreen(false)}
-                      className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg transition-all flex items-center gap-1.5 font-bold shadow-sm text-xs"
-                    >
-                      <Minimize size={14} />
-                      <span>원래 크기로</span>
-                    </button>
-                  </div>
-                )}
+                <div className="opacity-0 group-hover:opacity-100 bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-2xl transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+                  <Tv size={18} />
+                  시청각실로 이동
+                </div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsPipClosed(true);
+                  }}
+                  className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-rose-500 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-300"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
+        {/* Fullscreen Overlay */}
+        <AnimatePresence>
+          {isFitToScreen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] bg-neutral-950 flex flex-col"
+            >
+              <div className="h-16 bg-neutral-900/80 backdrop-blur-md border-b border-neutral-800 flex items-center justify-between px-8 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg overflow-hidden">
+                    <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-white font-bold font-title">모요 시청각실</span>
+                </div>
+                <button
+                  onClick={() => setIsFitToScreen(false)}
+                  className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl transition-all flex items-center gap-2 font-bold text-sm border border-neutral-700"
+                >
+                  <Minimize size={18} />
+                  <span>원래 크기로</span>
+                </button>
+              </div>
+              <div className="flex-1 relative bg-black">
                 <YouTube
                   videoId={currentVideoId}
                   ref={playerRef}
                   opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0 } }}
                   onPlay={onPlay}
                   onPause={onPause}
-                  onEnd={() => { isPlayingRef.current = false; updateServerState(false); }}
-                  onStateChange={(e) => {
-                    isPlayingRef.current = (e.data === 1 || e.data === 3);
-                  }}
-                  className={activeTab === 'youtube' && isFitToScreen ? "absolute top-10 bottom-0 left-0 right-0 bg-black" : "absolute inset-0 w-full h-full"}
-                  iframeClassName="w-full h-full pointer-events-auto"
+                  className="absolute inset-0 w-full h-full"
                 />
-                
-                {/* 동기화 중 오버레이 (시각적 효과) */}
-                {isSyncing && (
-                  <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-10 transition-all duration-300 pointer-events-none">
-                    <div className="bg-white/95 dark:bg-neutral-800/95 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2 sm:gap-3 shadow-xl text-sm sm:text-base">
-                      <RefreshCw size={20} className="animate-spin" />
-                      {activeTab === 'youtube' ? '영상을 동기화하고 있습니다...' : '동기화 중...'}
-                    </div>
-                  </div>
-                )}
-
-                {/* PIP 모드일 때 클릭 캡처 및 오버레이 */}
-                {activeTab !== 'youtube' && (
-                  <div 
-                    className="absolute inset-0 z-20"
-                    onClick={() => setActiveTab('youtube')}
-                  >
-                    <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-all flex items-center justify-center">
-                      <div className="opacity-0 group-hover:opacity-100 bg-black/80 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 backdrop-blur-sm transition-all transform translate-y-2 group-hover:translate-y-0">
-                        <Tv size={16} />
-                        크게 보기
-                      </div>
-                    </div>
-                    
-                    {/* 닫기 버튼 */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsPipClosed(true);
-                      }}
-                      className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all z-30"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </main>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
